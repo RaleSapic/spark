@@ -971,6 +971,12 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map("content" -> content))
   }
 
+  def wrongDatatypeInSomeRows(pos: Int, dataType: DataType): SparkSQLException = {
+    new SparkSQLException(
+      errorClass = "_LEGACY_ERROR_TEMP_3263",
+      messageParameters = Map("pos" -> pos.toString(), "type" -> dataType.typeName))
+  }
+
   def unsupportedArrayElementTypeBasedOnBinaryError(dt: DataType): SparkIllegalArgumentException = {
     new SparkIllegalArgumentException(
       errorClass = "_LEGACY_ERROR_TEMP_2084",
