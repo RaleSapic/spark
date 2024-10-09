@@ -585,43 +585,25 @@ object JdbcUtils extends Logging with SQLConfHelper {
             arr => new GenericArrayData(elementConversion(et0)(arr))
           }
 
+        case IntegerType => arrayConverter[Int]((i: Int) => i)
+        case FloatType => arrayConverter[Float]((f: Float) => f)
+        case DoubleType => arrayConverter[Double]((d: Double) => d)
+        case ShortType => arrayConverter[Short]((s: Short) => s)
+        case BooleanType => arrayConverter[Boolean]((b: Boolean) => b)
+        case LongType => arrayConverter[Long]((l: Long) => l)
         case _ => (array: Object) => array.asInstanceOf[Array[Any]]
       }
 
-      def verifyType(elem: Any, elemType: DataType): Boolean = elemType match {
-        case TimestampType => elem.isInstanceOf[Timestamp]
-        case TimestampNTZType => elem.isInstanceOf[Timestamp]
-        case StringType => elem.isInstanceOf[Object]
-        case DateType => elem.isInstanceOf[Date]
-        case dt: DecimalType => elem.isInstanceOf[java.math.BigDecimal]
-        case LongType if metadata.contains("binarylong") =>
-          throw QueryExecutionErrors.unsupportedArrayElementTypeBasedOnBinaryError(et)
-        case ArrayType(et0, _) => elem.isInstanceOf[Array[Any]] &&
-           elem.asInstanceOf[Array[Any]].forall(el => verifyType(el, et0))
-        case IntegerType => elem.isInstanceOf[Int]
-        case ByteType => elem.isInstanceOf[Byte]
-        case ShortType => elem.isInstanceOf[Short]
-        case FloatType => elem.isInstanceOf[Float]
-        case DoubleType => elem.isInstanceOf[Double]
-        case BooleanType => elem.isInstanceOf[Boolean]
-        case NullType => elem == null
-        case _ => true
-      }
-
-      def getArrayAndVerifyTypes(array: AnyRef, et: DataType, pos: Int): AnyRef = {
-        if (array.asInstanceOf[Array[Any]].forall(el => verifyType(el, et))) {
-          array
-        } else {
-          throw QueryExecutionErrors.wrongDatatypeInSomeRows(pos, et)
-        }
-      }
-
       (rs: ResultSet, row: InternalRow, pos: Int) =>
-        val array = nullSafeConvert[java.sql.Array](
-          input = rs.getArray(pos + 1),
-          array => new GenericArrayData(elementConversion(et)(
-            getArrayAndVerifyTypes(array.getArray, et, pos))))
-        row.update(pos, array)
+        try {
+          val array = nullSafeConvert[java.sql.Array](
+            input = rs.getArray(pos + 1),
+            array => new GenericArrayData(elementConversion(et)(array.getArray())))
+          row.update(pos, array)
+        } catch {
+          case e: java.lang.ClassCastException =>
+            throw QueryExecutionErrors.wrongDatatypeInSomeRows(pos, dt)
+        }
 
     case NullType =>
       (_: ResultSet, row: InternalRow, pos: Int) => row.update(pos, null)
